@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from discord import Intents, Client, Message
 from responses import get_response
 from discord.ext import commands
+from api import spotifyInit, create_playlist
 
 #load token
 load_dotenv()
@@ -58,17 +59,21 @@ async def hello(ctx):
     
     
 @bot.command()
-async def createP(ctx):
-    await ctx.send('Should')
+async def createP(ctx, *args):
+    playlist_name = args[0]
+    playlist_url = await create_playlist(playlist_name)
+    await ctx.send(playlist_url)
+
+# #initialize client, bot, and spotify api
+# client.run(token=TOKEN)
+# bot.run(token=TOKEN)
 
 
-client.run(token=TOKEN)
-bot.run(token=TOKEN)
 
-
-# def main() -> None:
-#     client.run(token=TOKEN)
-#     bot.run(token=TOKEN)
+def main() -> None:
+    spotifyInit()
+    client.run(token=TOKEN)
+    bot.run(token=TOKEN)
     
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+    main()
