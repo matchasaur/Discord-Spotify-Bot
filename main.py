@@ -1,7 +1,7 @@
 from typing import Final
 import os
 from dotenv import load_dotenv
-from discord import Intents, Client, Message
+from discord import Intents, Client, Message, utils, CategoryChannel
 from responses import get_response
 from discord.ext import commands
 from api import spotifyInit, create_playlist
@@ -64,14 +64,34 @@ async def createP(ctx, *args):
     playlist_url = await create_playlist(playlist_name)
     await ctx.send(playlist_url)
 
-# #initialize client, bot, and spotify api
-# client.run(token=TOKEN)
-# bot.run(token=TOKEN)
-
+@bot.command()
+async def create_channel(ctx, channel_name: str):
+    guild = ctx.guild
+    
+    # Check if the category exists
+    category_name = "Collab Playlists"
+    category = utils.get(guild.categories, name=category_name)
+    
+    if not category:
+        # If category doesn't exist, create the category
+        category = await guild.create_category(category_name)
+    
+    #Retrive list of all channels(playlists) existing
+    text_channel_list = category.text_channels
+    
+    for text_channel in text_channel_list:
+        # If the channel already exists in the category, exit the command
+        if text_channel.name == channel_name:
+            await ctx.send(f"A text channel with the name `{channel_name}` already exists in category `{category_name}`.")
+            return
+    
+    # Create the text channel within the category
+    new_channel = await category.create_text_channel(name=channel_name)
+    await ctx.send(f"Text channel `{channel_name}` created successfully in category `{category_name}`.")
 
 
 def main() -> None:
-    spotifyInit()
+    #spotifyInit()
     client.run(token=TOKEN)
     bot.run(token=TOKEN)
     
