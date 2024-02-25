@@ -80,7 +80,7 @@ async def create_playlist(title: str):
 
     if response.status_code == 200:
         print("Playlist created successfully!")
-        return (f'Playlist created successfully!\n{playlist_url}')
+        return (playlist_url)
     else:
         print("Error creating playlist:", response.json())
-        return 'Unable to create playlist'
+        return False
