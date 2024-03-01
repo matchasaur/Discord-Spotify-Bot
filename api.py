@@ -78,7 +78,7 @@ async def create_playlist(title: str):
     print(response_data['external_urls']['spotify'])
     playlist_url = response_data['external_urls']['spotify']
 
-    if response.status_code == 200:
+    if response.status_code == 200 or response.status_code == 201:
         print("Playlist created successfully!")
         return (playlist_url)
     else:

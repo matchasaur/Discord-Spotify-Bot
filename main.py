@@ -5,9 +5,24 @@ from discord import Intents, Client, Message, utils, CategoryChannel
 from responses import get_response
 from discord.ext import commands
 from api import spotifyInit, create_playlist
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
+import pymongo
+
+load_dotenv()
+mongopw = os.getenv('MONGOPW')
+uri = f"mongodb+srv://jtanu45:{mongopw}@snoopster.uudikfw.mongodb.net/?retryWrites=true&w=majority&appName=Snoopster"
+# Create a new client and connect to the server
+dbclient = MongoClient(uri, server_api=ServerApi('1'))
+database = dbclient.dev
+# Send a ping to confirm a successful connection
+try:
+    dbclient.admin.command('ping')
+    print("Pinged your deployment. You successfully connected to MongoDB!")
+except Exception as e:
+    print(e)
 
 #load token
-load_dotenv()
 TOKEN: Final[str] = os.getenv('DISCORD_TOKEN')
 print(TOKEN)
 
@@ -61,6 +76,7 @@ async def hello(ctx):
 @bot.command()
 async def createP(ctx, *args):
     guild = ctx.guild
+    author = ctx.author
     
     playlist_name = args[0]
     playlist_url = await create_playlist(playlist_name)
@@ -81,6 +97,35 @@ async def createP(ctx, *args):
     new_channel = await category.create_text_channel(name=playlist_name)
     await ctx.send(f"Text channel `{playlist_name}` created successfully in category `{category_name}`.")    
     await new_channel.send(f'@here Here is your new playlist!{playlist_url}')
+    
+    #now create an instance in the database
+
+    # Find the index of 'playlist/' and '?'
+    start_index = playlist_url.find('playlist/') + len('playlist/')
+    end_index = playlist_url.find('?')
+
+    # Slice the link to extract the playlist ID
+    playlist_id = playlist_url[start_index:end_index]
+
+    print("Playlist ID:", playlist_id)
+    
+    userlist = []
+    userlist.append(str(author.id))
+    
+    collection = database.playlists_info
+    
+    doc = {
+        'name': playlist_name,
+        'guildid': str(guild.id),
+        'channelid': str(new_channel.id),
+        'playlistid': playlist_id,
+        'ownerid': str(author.id),
+        'ownername': author.global_name,
+        'users': userlist,
+    }
+    
+    result = collection.insert_one(doc)
+    print(f"Document inserted with id: {result.inserted_id}")
 
 # @bot.command()
 # async def create_channel(ctx, channel_name: str):
@@ -112,6 +157,7 @@ def main() -> None:
     spotifyInit()
     # client.run(token=TOKEN)
     bot.run(token=TOKEN)
+    
     
 if __name__ == '__main__':
     main()
