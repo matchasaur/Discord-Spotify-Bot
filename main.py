@@ -1,9 +1,10 @@
 from typing import Final
 import os
 from dotenv import load_dotenv
-from discord import Intents, Client, Message
+from discord import Intents, Client, Message, utils, CategoryChannel
 from responses import get_response
 from discord.ext import commands
+from api import spotifyInit, create_playlist
 
 #load token
 load_dotenv()
@@ -58,17 +59,59 @@ async def hello(ctx):
     
     
 @bot.command()
-async def createP(ctx):
-    await ctx.send('Should')
-
-
-client.run(token=TOKEN)
-bot.run(token=TOKEN)
-
-
-# def main() -> None:
-#     client.run(token=TOKEN)
-#     bot.run(token=TOKEN)
+async def createP(ctx, *args):
+    guild = ctx.guild
     
-# if __name__ == '__main__':
-#     main()
+    playlist_name = args[0]
+    playlist_url = await create_playlist(playlist_name)
+    
+    if not playlist_url:
+        await ctx.send('Unable to create new playlist')
+        return
+
+    # Check if the category exists
+    category_name = "Collab Playlists"
+    category = utils.get(guild.categories, name=category_name)
+    
+    if not category:
+        # If category doesn't exist, create the category
+        category = await guild.create_category(category_name)
+    
+    # Create the text channel within the category
+    new_channel = await category.create_text_channel(name=playlist_name)
+    await ctx.send(f"Text channel `{playlist_name}` created successfully in category `{category_name}`.")    
+    await new_channel.send(f'@here Here is your new playlist!{playlist_url}')
+
+# @bot.command()
+# async def create_channel(ctx, channel_name: str):
+#     guild = ctx.guild
+    
+#     # Check if the category exists
+#     category_name = "Collab Playlists"
+#     category = utils.get(guild.categories, name=category_name)
+    
+#     if not category:
+#         # If category doesn't exist, create the category
+#         category = await guild.create_category(category_name)
+    
+#     #Retrive list of all channels(playlists) existing
+#     text_channel_list = category.text_channels
+    
+#     for text_channel in text_channel_list:
+#         # If the channel already exists in the category, exit the command
+#         if text_channel.name == channel_name:
+#             await ctx.send(f"A text channel with the name `{channel_name}` already exists in category `{category_name}`.")
+#             return
+    
+#     # Create the text channel within the category
+#     new_channel = await category.create_text_channel(name=channel_name)
+#     await ctx.send(f"Text channel `{channel_name}` created successfully in category `{category_name}`.")
+
+
+def main() -> None:
+    spotifyInit()
+    # client.run(token=TOKEN)
+    bot.run(token=TOKEN)
+    
+if __name__ == '__main__':
+    main()
