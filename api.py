@@ -78,9 +78,25 @@ async def create_playlist(title: str):
     print(response_data['external_urls']['spotify'])
     playlist_url = response_data['external_urls']['spotify']
 
-    if response.status_code == 200:
+    if response.status_code == 200 or response.status_code == 201:
         print("Playlist created successfully!")
         return (playlist_url)
     else:
         print("Error creating playlist:", response.json())
+        return False
+    
+async def delete_playlist(id: str):
+    playlist_id = id
+    access_token = os.getenv('SPOT_AUTH')
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+    }   
+
+    response = requests.delete(f"https://api.spotify.com/v1/playlists/{playlist_id}/followers", headers=headers)
+
+    if response.status_code == 200:
+        print("Playlist deleted successfully")
+        return True
+    else:
+        print("Failed to delete playlist:", response.status_code, response.text)
         return False
