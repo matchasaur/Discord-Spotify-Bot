@@ -5,7 +5,7 @@ from discord import Intents, Client, Message, utils, CategoryChannel, ui, Button
 import discord
 from responses import get_response
 from discord.ext import commands
-from api import spotifyInit, create_playlist
+from api import spotifyInit, create_playlist, delete_playlist
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import pymongo
@@ -101,12 +101,7 @@ async def createP(ctx, *args):
     
     #now create an instance in the database
 
-    # Find the index of 'playlist/' and '?'
-    start_index = playlist_url.find('playlist/') + len('playlist/')
-    end_index = playlist_url.find('?')
-
-    # Slice the link to extract the playlist ID
-    playlist_id = playlist_url[start_index:end_index]
+    playlist_id = playlist_url.split('/')[-1]
 
     print("Playlist ID:", playlist_id)
     
@@ -132,12 +127,13 @@ async def createP(ctx, *args):
 @bot.command()
 async def deleteP(ctx):
     class Menu(ui.View):
-        def __init__(self, channelid: str, guildid: str, ownerid: str):
+        def __init__(self, channelid: str, guildid: str, ownerid: str, channel: discord.channel):
             super().__init__()
             self.value = None
             self.channelid = channelid
             self.guildid = guildid
             self.ownerid = ownerid
+            self.channel = channel
             
         @ui.button(label='Cancel', style=ButtonStyle.grey)
         async def option1(self, interaction: Interaction, button: ui.Button):
@@ -148,20 +144,24 @@ async def deleteP(ctx):
         @ui.button(label='Delete', style=ButtonStyle.danger)
         async def option2(self, interaction: Interaction, button: ui.Button):
             guild = self.guildid
-            channel = self.channelid
+            channelid = self.channelid
             owner = self.ownerid
-            name = delete_playlist(channel_id=channel, guild_id=guild, owner_id=owner)
-            await interaction.response.send_message(f'{name} has been deleted')
+            channel = self.channel
+            name = await deleteplaylist(channel_id=channelid, guild_id=guild, owner_id=owner, channel=channel)
+            if name:
+                await interaction.response.send_message(f'{name} has been deleted')
+            else:
+                await interaction.response.send_message(f'Ran into an error while attempting to delete the playlist...')
             #debug
             #print('guild: ', guild, '\nchannel: ', channel)
             self.value = False
             self.stop()
             
     user = ctx.author
-    guild = ctx.guild.id
+    guild = str(ctx.guild.id)
     channel = ctx.channel
-    owner_id = user.id
-    channel_id = channel.id
+    owner_id = str(user.id)
+    channel_id = str(channel.id)
     
     #If the author is not the owner of the playlist then return
     if not check_owner(owner_id=owner_id, channel_id=channel_id):
@@ -170,59 +170,45 @@ async def deleteP(ctx):
     
     embed = Embed(color=discord.Color.red())
     embed.add_field(name='', value='Are you sure you want to order the eggroll?')
-    view = Menu(channelid=channel_id, guildid=guild, ownerid=owner_id)
+    view = Menu(channelid=channel_id, guildid=guild, ownerid=owner_id, channel=channel)
     await user.send(embed=embed, view=view)
 
-
-
-#Helper functions
+#Helper functions-----------------------------------------
 
 #check if author is owner of playlist/channel
 def check_owner(owner_id: str, channel_id: str):
     collection = database.playlists_info
+    print(f'Checking if {owner_id} owns channel: {channel_id}')
     result = collection.find_one({'ownerid': owner_id, 'channelid': channel_id})
+    print(f'The reuslt is: {result}')
     return result
 
-def delete_playlist(channel_id: str, guild_id: str, owner_id: str):
+async def deleteplaylist(channel_id: str, guild_id: str, owner_id: str, channel: discord.channel):
     collection = database.playlists_info
     doc = collection.find_one({'ownerid': owner_id, 'channelid': channel_id})
     name = doc.get('name', None)
+    id = doc.get('playlistid', None)
+    print('Playlist ID: ', id)
+    res = await delete_playlist(id)
+    
+    if not res:
+        print('Unable to delete playlist through spotify')
+        return False
+    
     result = collection.delete_one({'ownerid': owner_id, 'channelid': channel_id, 'guildid': guild_id})
     
     if result.deleted_count > 0:
         print(f'Document with guildid: {guild_id}, channelid: {channel_id}, and ownerid: {owner_id} has been deleted')  # Document was found and deleted
+        await channel.delete()
         return name
     else:
         print('Document not found')  # Document was not found
-
-# @bot.command()
-# async def create_channel(ctx, channel_name: str):
-#     guild = ctx.guild
+        return False
     
-#     # Check if the category exists
-#     category_name = "Collab Playlists"
-#     category = utils.get(guild.categories, name=category_name)
     
-#     if not category:
-#         # If category doesn't exist, create the category
-#         category = await guild.create_category(category_name)
-    
-#     #Retrive list of all channels(playlists) existing
-#     text_channel_list = category.text_channels
-    
-#     for text_channel in text_channel_list:
-#         # If the channel already exists in the category, exit the command
-#         if text_channel.name == channel_name:
-#             await ctx.send(f"A text channel with the name `{channel_name}` already exists in category `{category_name}`.")
-#             return
-    
-#     # Create the text channel within the category
-#     new_channel = await category.create_text_channel(name=channel_name)
-#     await ctx.send(f"Text channel `{channel_name}` created successfully in category `{category_name}`.")
-
 
 def main() -> None:
-    #spotifyInit()
+    spotifyInit()
     # client.run(token=TOKEN)
     bot.run(token=TOKEN)
     
