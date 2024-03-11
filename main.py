@@ -8,8 +8,10 @@ from discord.ext import commands
 from api import spotifyInit, create_playlist, delete_playlist
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
-import pymongo
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
 
+#Start by connecting to our database
 load_dotenv()
 mongopw = os.getenv('MONGOPW')
 uri = f"mongodb+srv://jtanu45:{mongopw}@snoopster.uudikfw.mongodb.net/?retryWrites=true&w=majority&appName=Snoopster"
@@ -23,7 +25,17 @@ try:
 except Exception as e:
     print(e)
 
-#load token
+#Now lets connect and authorize with spotify
+scope = 'playlist-modify-private playlist-modify-public user-library-read'  # Scopes needed for creating a playlist
+sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
+spuser = sp.current_user() #This is the spotify bot account, use for spotipy methods for crud operations
+spuserID = spuser['id']
+if sp:
+    print('Successfully authenticated with Spotify')
+else:
+    print('Unaable to authenticate with Spotify')
+    
+#Then lets initialize our discord bot/client
 TOKEN: Final[str] = os.getenv('DISCORD_TOKEN')
 print(TOKEN)
 
@@ -80,9 +92,11 @@ async def createP(ctx, *args):
     author = ctx.author
     
     playlist_name = args[0]
-    playlist_url = await create_playlist(playlist_name)
+    #playlist_url = await create_playlist(playlist_name)
+    new_playlist = sp.user_playlist_create(spuserID, playlist_name, description='')
     
-    if not playlist_url:
+    
+    if not new_playlist:
         await ctx.send('Unable to create new playlist')
         return
 
@@ -95,6 +109,7 @@ async def createP(ctx, *args):
         category = await guild.create_category(category_name)
     
     # Create the text channel within the category
+    playlist_url = new_playlist['external_urls']['spotify']
     new_channel = await category.create_text_channel(name=playlist_name)
     await ctx.send(f"Text channel `{playlist_name}` created successfully in category `{category_name}`.")    
     await new_channel.send(f'@here Here is your new playlist!{playlist_url}')
@@ -189,7 +204,9 @@ async def deleteplaylist(channel_id: str, guild_id: str, owner_id: str, channel:
     name = doc.get('name', None)
     id = doc.get('playlistid', None)
     print('Playlist ID: ', id)
-    res = await delete_playlist(id)
+    # res = await delete_playlist(id)
+    res = sp.user_playlist_unfollow(spuserID, id)
+    #Fix this? For some reason its deleting but return false
     
     if not res:
         print('Unable to delete playlist through spotify')
@@ -208,7 +225,7 @@ async def deleteplaylist(channel_id: str, guild_id: str, owner_id: str, channel:
     
 
 def main() -> None:
-    spotifyInit()
+    #spotifyInit()
     # client.run(token=TOKEN)
     bot.run(token=TOKEN)
     
