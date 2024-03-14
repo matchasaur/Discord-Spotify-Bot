@@ -1,6 +1,5 @@
 from typing import Final
 import os
-# from dotenv import load_dotenv
 from discord import Intents, Client, Message, utils, CategoryChannel, ui, ButtonStyle, Interaction, Embed
 import discord
 from responses import get_response
@@ -13,7 +12,6 @@ from spotipy.oauth2 import SpotifyOAuth
 from datetime import datetime
 
 #Start by connecting to our database
-# load_dotenv()
 mongopw = os.getenv('MONGOPW')
 uri = f"mongodb+srv://jtanu45:{mongopw}@snoopster.uudikfw.mongodb.net/?retryWrites=true&w=majority&appName=Snoopster"
 # Create a new client and connect to the server
