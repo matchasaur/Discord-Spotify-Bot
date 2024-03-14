@@ -94,7 +94,7 @@ async def createP(ctx, *args):
     
     playlist_name = args[0]
     #playlist_url = await create_playlist(playlist_name)
-    new_playlist = sp.user_playlist_create(spuserID, playlist_name, description='')
+    new_playlist = sp.user_playlist_create(spuserID, playlist_name, description='', public=False)
     
     
     if not new_playlist:
@@ -134,6 +134,7 @@ async def createP(ctx, *args):
         'ownerid': str(author.id),
         'ownername': author.global_name,
         'users': userlist,
+        "createdAt": datetime.now()
     }
     
     result = collection.insert_one(doc)
@@ -185,7 +186,7 @@ async def deleteP(ctx):
         return
     
     embed = Embed(color=discord.Color.red())
-    embed.add_field(name='', value=f'Are you sure you want to delete {str(channel.name)} in {str(ctx.guild.name)}?')
+    embed.add_field(name='', value=f'Are you sure you want to delete {str(channel.name)} in {str(ctx.guild.name)}?\n*Note: While the playlists remain available for your listening pleasure, please be aware that the associated database information will be deleted. Additionally, all bot functionalities related to these playlists will no longer be active.*')
     view = Menu(channelid=channel_id, guildid=guild, ownerid=owner_id, channel=channel)
     await user.send(embed=embed, view=view)
 
@@ -218,7 +219,7 @@ async def addsong(ctx, *args):
         "playlistid": playlistid,
         "channelid": channelid,
         "track": track,
-        "timestamp": datetime.now()
+        "createdAt": datetime.now()
     }
     
     collection.insert_one(doc)
@@ -288,6 +289,8 @@ async def deleteplaylist(channel_id: str, guild_id: str, owner_id: str, channel:
     #     return False
     
     result = collection.delete_one({'ownerid': owner_id, 'channelid': channel_id, 'guildid': guild_id})
+    collection = database.tracks
+    collection.delete_many({'channelid': channel_id, 'guildid': guild_id, 'playlistid': id})
     
     if result.deleted_count > 0:
         print(f'Document with guildid: {guild_id}, channelid: {channel_id}, and ownerid: {owner_id} has been deleted')  # Document was found and deleted
@@ -296,6 +299,8 @@ async def deleteplaylist(channel_id: str, guild_id: str, owner_id: str, channel:
     else:
         print('Document not found')  # Document was not found
         return False
+    
+    
     
     
 
