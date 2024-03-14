@@ -10,6 +10,7 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+from datetime import datetime
 
 #Start by connecting to our database
 load_dotenv()
@@ -93,7 +94,7 @@ async def createP(ctx, *args):
     
     playlist_name = args[0]
     #playlist_url = await create_playlist(playlist_name)
-    new_playlist = sp.user_playlist_create(spuserID, playlist_name, description='')
+    new_playlist = sp.user_playlist_create(spuserID, playlist_name, description='', public=False)
     
     
     if not new_playlist:
@@ -133,6 +134,7 @@ async def createP(ctx, *args):
         'ownerid': str(author.id),
         'ownername': author.global_name,
         'users': userlist,
+        "createdAt": datetime.now()
     }
     
     result = collection.insert_one(doc)
@@ -184,13 +186,85 @@ async def deleteP(ctx):
         return
     
     embed = Embed(color=discord.Color.red())
-    embed.add_field(name='', value='Are you sure you want to order the eggroll?')
+    embed.add_field(name='', value=f'Are you sure you want to delete {str(channel.name)} in {str(ctx.guild.name)}?\n*Note: While the playlists remain available for your listening pleasure, please be aware that the associated database information will be deleted. Additionally, all bot functionalities related to these playlists will no longer be active.*')
     view = Menu(channelid=channel_id, guildid=guild, ownerid=owner_id, channel=channel)
     await user.send(embed=embed, view=view)
+
+@bot.command()
+async def addsong(ctx, *args):
+    userid = str(ctx.author.id)
+    guildid = str(ctx.guild.id)
+    channelid = str(ctx.channel.id)
+
+    track = args[0]
+    print('Track url: ', track)
+    
+    collection = database.playlists_info
+    doc = collection.find_one({'channelid': channelid, 'guildid': guildid})
+    playlistid = doc.get('playlistid', None)
+    
+    res = sp.user_playlist_add_tracks(spuserID, playlistid, [track], position=None)
+
+    #Fix this: Need a safeguard incase the track was unable to be added
+    # if not res:
+    #     print('Could not add track to playlist')
+    #     await ctx.send('Could not add track to playlist')
+    #     return
+    
+    collection = database.tracks
+    
+    doc = {
+        "user": userid,
+        "guildid": guildid,
+        "playlistid": playlistid,
+        "channelid": channelid,
+        "track": track,
+        "createdAt": datetime.now()
+    }
+    
+    collection.insert_one(doc)
+
+    print('Track added to playlist')
+    await ctx.send('Track added to playlist')
+
+@bot.command()
+async def removesong(ctx, *args):
+    userid = str(ctx.author.id)
+    guildid = str(ctx.guild.id)
+    channelid = str(ctx.channel.id)
+
+    track = args[0]
+    print('Track url: ', track)
+    
+    collection1 = database.playlists_info
+    doc1 = collection1.find_one({'channelid': channelid, 'guildid': guildid})
+    owner = doc1.get('ownerid', None)
+    playlistid = doc1.get('playlistid', None)
+    
+    collection2 = database.tracks
+    doc2 = collection2.find_one({'playlistid': playlistid, 'channelid': channelid, 'guildid': guildid, 'playlistid': playlistid, 'track': track})
+    
+    if doc2:
+        user = doc2.get('user')
+        if userid == user or userid == owner:
+            # trackid = track.split('/')[-1]
+            # uri = f'spotify:track:{trackid}'
+            sp.user_playlist_remove_all_occurrences_of_tracks(spuserID, playlistid, [track], snapshot_id=None)
+            collection2.delete_one(doc2)
+            print(f'Successfully removed track')
+            await ctx.send(f'Successfully removed track')
+        else:
+            print(f'Unauthorized access. User has not added this track.')
+            await ctx.send(f'Unauthorized access. User has not added this track.')
+    else:
+        print(f'Track({track}) does not exist in playlist{playlistid}')
+        await ctx.send('Unable to remove track. This track does not exist in the playlist.')
+    
 
 #Helper functions-----------------------------------------
 
 #check if author is owner of playlist/channel
+
 def check_owner(owner_id: str, channel_id: str):
     collection = database.playlists_info
     print(f'Checking if {owner_id} owns channel: {channel_id}')
@@ -207,12 +281,16 @@ async def deleteplaylist(channel_id: str, guild_id: str, owner_id: str, channel:
     # res = await delete_playlist(id)
     res = sp.user_playlist_unfollow(spuserID, id)
     #Fix this? For some reason its deleting but return false
+    print('Del response: ', res)
     
-    if not res:
-        print('Unable to delete playlist through spotify')
-        return False
+    #FIX THIS: Currently there is no way to check if the playlist has successfully been deleted on spotify
+    # if not res:
+    #     print('Unable to delete playlist through spotify')
+    #     return False
     
     result = collection.delete_one({'ownerid': owner_id, 'channelid': channel_id, 'guildid': guild_id})
+    collection = database.tracks
+    collection.delete_many({'channelid': channel_id, 'guildid': guild_id, 'playlistid': id})
     
     if result.deleted_count > 0:
         print(f'Document with guildid: {guild_id}, channelid: {channel_id}, and ownerid: {owner_id} has been deleted')  # Document was found and deleted
@@ -221,6 +299,8 @@ async def deleteplaylist(channel_id: str, guild_id: str, owner_id: str, channel:
     else:
         print('Document not found')  # Document was not found
         return False
+    
+    
     
     
 
