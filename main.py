@@ -4,7 +4,7 @@ from discord import Intents, Client, Message, utils, CategoryChannel, ui, Button
 import discord
 from responses import get_response
 from discord.ext import commands
-from api import spotifyInit, create_playlist, delete_playlist
+#from api import spotifyInit, create_playlist, delete_playlist
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import spotipy
