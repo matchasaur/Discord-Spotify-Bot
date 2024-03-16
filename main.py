@@ -14,7 +14,7 @@ from datetime import datetime
 
 #Start by connecting to our database
 mongopw = os.getenv('MONGOPW')
-uri = f"mongodb+srv://jtanu45:{mongopw}@snoopster.uudikfw.mongodb.net/?retryWrites=true&w=majority&appName=Snoopster"
+uri = os.getenv('MONGOURI')
 # Create a new client and connect to the server
 dbclient = MongoClient(uri, server_api=ServerApi('1'))
 database = dbclient.dev
