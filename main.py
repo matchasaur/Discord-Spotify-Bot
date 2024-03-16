@@ -9,6 +9,7 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
+from spotipy.oauth2 import SpotifyOAuth
 from datetime import datetime
 
 #Start by connecting to our database
@@ -26,7 +27,7 @@ except Exception as e:
 
 #Now lets connect and authorize with spotify
 scope = 'playlist-modify-private playlist-modify-public user-library-read'  # Scopes needed for creating a playlist
-sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials())
+sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
 spuser = sp.current_user() #This is the spotify bot account, use for spotipy methods for crud operations
 spuserID = spuser['id']
 if sp:
