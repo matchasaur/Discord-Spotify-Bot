@@ -27,7 +27,7 @@ except Exception as e:
 
 #Now lets connect and authorize with spotify
 scope = 'playlist-modify-private playlist-modify-public user-library-read'  # Scopes needed for creating a playlist
-sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
+sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope, open_browser=False))
 spuser = sp.current_user() #This is the spotify bot account, use for spotipy methods for crud operations
 spuserID = spuser['id']
 if sp:
