@@ -15,7 +15,7 @@ from datetime import datetime
 #Start by connecting to our database
 load_dotenv()
 mongopw = os.getenv('MONGOPW')
-uri = f"mongodb+srv://jtanu45:{mongopw}@snoopster.uudikfw.mongodb.net/?retryWrites=true&w=majority&appName=Snoopster"
+uri = os.getenv('MONGOURI')
 # Create a new client and connect to the server
 dbclient = MongoClient(uri, server_api=ServerApi('1'))
 database = dbclient.dev
@@ -28,7 +28,7 @@ except Exception as e:
 
 #Now lets connect and authorize with spotify
 scope = 'playlist-modify-private playlist-modify-public user-library-read'  # Scopes needed for creating a playlist
-sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
+sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope, open_browser=False))
 spuser = sp.current_user() #This is the spotify bot account, use for spotipy methods for crud operations
 spuserID = spuser['id']
 if sp:
