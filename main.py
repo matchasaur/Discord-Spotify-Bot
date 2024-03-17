@@ -59,14 +59,19 @@ async def send_message(message: Message, user_message: str) -> None:
     except Exception as e:
         print(e)
         
+
+#CREATE COMMANDS----------------------------------
+bot = commands.Bot(command_prefix="sb!", intents=intents)
+
 #bot startup
-@client.event
-async def on_ready() -> None:
-    print(f'{client.user} is now running!')
+@bot.event
+async def on_ready():
+    print(f'{bot.user} is now running!')
+    await bot.tree.sync()
 
 #Handle Incoming Messages
-@client.event
-async def on_message(message: Message) -> None:
+@bot.event
+async def on_message(message: Message):
     if message.author == client.user:
         return
     
@@ -75,24 +80,20 @@ async def on_message(message: Message) -> None:
     channel: str = str(message.channel)
     
     print(f'[{channel}] {username}: "{user_message}"')
-    await send_message(message, user_message)
+    # await send_message(message, user_message)
     await bot.process_commands(message)
-    
-    
-#CREATE COMMANDS----------------------------------
-bot = commands.Bot(command_prefix="sb!", intents=intents)
 
-@bot.command()
+@bot.hybrid_command()
 async def hello(ctx):
     await ctx.send('Hello! I am snoopy.')
     
     
-@bot.command()
-async def createP(ctx, *args):
+@bot.hybrid_command(description="Creates a private text channel and spotify playlist", name="newplaylist")
+async def createP(ctx, arg1: str):
     guild = ctx.guild
     author = ctx.author
     
-    playlist_name = args[0]
+    playlist_name = arg1
     #playlist_url = await create_playlist(playlist_name)
     new_playlist = sp.user_playlist_create(spuserID, playlist_name, description='', public=False)
     
@@ -141,7 +142,7 @@ async def createP(ctx, *args):
     print(f"Document inserted with id: {result.inserted_id}")
 
 #delete playlist within text-channel
-@bot.command()
+@bot.hybrid_command(description="Deletes text-channel and spotify playlist", name="deleteplaylist")
 async def deleteP(ctx):
     class Menu(ui.View):
         def __init__(self, channelid: str, guildid: str, ownerid: str, channel: discord.channel):
@@ -190,20 +191,24 @@ async def deleteP(ctx):
     view = Menu(channelid=channel_id, guildid=guild, ownerid=owner_id, channel=channel)
     await user.send(embed=embed, view=view)
 
-@bot.command()
-async def addsong(ctx, *args):
+@bot.hybrid_command(description="Add track to associated spotify playlist", name="addtrack")
+async def addsong(ctx, arg1: str):
     userid = str(ctx.author.id)
     guildid = str(ctx.guild.id)
     channelid = str(ctx.channel.id)
 
-    track = args[0]
+    track = arg1
     print('Track url: ', track)
     
     collection = database.playlists_info
     doc = collection.find_one({'channelid': channelid, 'guildid': guildid})
     playlistid = doc.get('playlistid', None)
-    
+    playlistname = doc.get('name', None)
     res = sp.user_playlist_add_tracks(spuserID, playlistid, [track], position=None)
+    trackinfo = sp.track(track_id=track)
+    # print(trackinfo)
+    trackartist = trackinfo['artists'][0]['name']
+    trackname = trackinfo['name']
 
     #Fix this: Need a safeguard incase the track was unable to be added
     # if not res:
@@ -225,24 +230,28 @@ async def addsong(ctx, *args):
     collection.insert_one(doc)
 
     print('Track added to playlist')
-    await ctx.send('Track added to playlist')
+    await ctx.send(f'```{trackname} by {trackartist} added to {playlistname}!```')
 
-@bot.command()
-async def removesong(ctx, *args):
+@bot.hybrid_command(description="Remove track from associated spotify playlist", name="removetrack")
+async def removesong(ctx, arg1: str):
     userid = str(ctx.author.id)
     guildid = str(ctx.guild.id)
     channelid = str(ctx.channel.id)
 
-    track = args[0]
+    track = arg1
     print('Track url: ', track)
     
     collection1 = database.playlists_info
     doc1 = collection1.find_one({'channelid': channelid, 'guildid': guildid})
     owner = doc1.get('ownerid', None)
     playlistid = doc1.get('playlistid', None)
+    playlistname = doc1.get('name', None)
     
     collection2 = database.tracks
     doc2 = collection2.find_one({'playlistid': playlistid, 'channelid': channelid, 'guildid': guildid, 'playlistid': playlistid, 'track': track})
+    trackinfo = sp.track(track_id=track)
+    trackname = trackinfo['name']
+    trackartist = trackinfo['artists'][0]['name']
     
     if doc2:
         user = doc2.get('user')
@@ -252,7 +261,7 @@ async def removesong(ctx, *args):
             sp.user_playlist_remove_all_occurrences_of_tracks(spuserID, playlistid, [track], snapshot_id=None)
             collection2.delete_one(doc2)
             print(f'Successfully removed track')
-            await ctx.send(f'Successfully removed track')
+            await ctx.send(f'```{trackname} by {trackartist} removed from {playlistname}!```')
         else:
             print(f'Unauthorized access. User has not added this track.')
             await ctx.send(f'Unauthorized access. User has not added this track.')
