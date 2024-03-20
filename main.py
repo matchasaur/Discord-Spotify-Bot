@@ -109,10 +109,15 @@ async def createP(ctx, arg1: str):
     if not category:
         # If category doesn't exist, create the category
         category = await guild.create_category(category_name)
+        
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(read_messages=False),
+        author: discord.PermissionOverwrite(read_messages=True)
+    }
     
     # Create the text channel within the category
     playlist_url = new_playlist['external_urls']['spotify']
-    new_channel = await category.create_text_channel(name=playlist_name)
+    new_channel = await category.create_text_channel(name=playlist_name, overwrites=overwrites)
     await ctx.send(f"Text channel `{playlist_name}` created successfully in category `{category_name}`.")    
     await new_channel.send(f'@here Here is your new playlist!{playlist_url}')
     
@@ -129,6 +134,7 @@ async def createP(ctx, arg1: str):
     
     doc = {
         'name': playlist_name,
+        'guildname': str(guild.name),
         'guildid': str(guild.id),
         'channelid': str(new_channel.id),
         'playlistid': playlist_id,
@@ -269,7 +275,56 @@ async def removesong(ctx, arg1: str):
         print(f'Track({track}) does not exist in playlist{playlistid}')
         await ctx.send('Unable to remove track. This track does not exist in the playlist.')
     
+@bot.hybrid_command(description="Invites a user to collaborate on a playlist", name="invite")
+async def invite(ctx, arg1: str):
+    class Menu(ui.View):
+        def __init__(self, channelid: str, guildid: str, channel: discord.channel, user: discord.user, playlistname: str, guildname: str):
+            super().__init__()
+            self.value = None
+            self.channelid = channelid
+            self.guildid = guildid
+            self.channel = channel
+            self.user = user
+            self.playlistname = playlistname
+            self.guildname = guildname
+            
+        @ui.button(label='Accept', style=ButtonStyle.green)
+        async def acceptinvite(self, interaction: Interaction, button: ui.Button):
+            permissions = self.channel.permissions_for(self.user)
+            permissions.read_messages = True
+            
+            await self.channel.set_permissions(self.user, overwrite=permissions)
+            
+            await interaction.response.send_message(f'You have been added to {self.playlistname} in {self.guildname}')
+    
+    user = await ctx.guild.fetch_member(int(arg1))
+    members = ctx.channel.members
+    print('members: ', members)
+    
+    #Check if this user is still in the server
+    if not user:
+        await ctx.reply('This user does not exist in this server')
+        return
+    elif user in ctx.channel.members:
+        await ctx.reply(f'This user already exists in {ctx.chanel.name}')
+        return
+    
+    author = ctx.author.global_name
+    guild = str(ctx.guild.id)
+    channel = ctx.channel
+    channel_id = str(channel.id)
+    collection = database.playlists_info
+    doc = collection.find_one({'channelid': channel_id, 'guildid': guild})
+    playlistname = doc.get('name', None)
+    guildname = ctx.guild.name
+    
+    embed = Embed(color=discord.Color.purple())
+    embed.add_field(name='Playlist Invite', value=f'{author} has invnited you to collaborate on {playlistname} in {guildname}\n*Note: This invitation will expire in 120 seconds*')
+    view = Menu(channelid=channel_id, guildid=guild, channel=channel, user=user, playlistname=playlistname, guildname=guildname)
+    await ctx.author.send(embed=embed, view=view)
+        
 
+        
 #Helper functions-----------------------------------------
 
 #check if author is owner of playlist/channel
