@@ -42,6 +42,7 @@ print(TOKEN)
 
 intents: Intents = Intents.default()
 intents.message_content = True # NOQA
+intents.members = True
 client: Client = Client(intents=intents)
 
 #message func
@@ -274,7 +275,7 @@ async def removesong(ctx, arg1: str):
     else:
         print(f'Track({track}) does not exist in playlist{playlistid}')
         await ctx.send('Unable to remove track. This track does not exist in the playlist.')
-    
+
 @bot.hybrid_command(description="Invites a user to collaborate on a playlist", name="invite")
 async def invite(ctx, arg1: str):
     class Menu(ui.View):
@@ -290,11 +291,10 @@ async def invite(ctx, arg1: str):
             
         @ui.button(label='Accept', style=ButtonStyle.green)
         async def acceptinvite(self, interaction: Interaction, button: ui.Button):
-            permissions = self.channel.permissions_for(self.user)
-            permissions.read_messages = True
-            
-            await self.channel.set_permissions(self.user, overwrite=permissions)
-            
+            overwrite = discord.PermissionOverwrite()
+            overwrite.read_messages = True
+            overwrite.send_messages = True
+            await self.channel.set_permissions(self.user, overwrite=overwrite)
             await interaction.response.send_message(f'You have been added to {self.playlistname} in {self.guildname}')
     
     user = await ctx.guild.fetch_member(int(arg1))
@@ -306,7 +306,7 @@ async def invite(ctx, arg1: str):
         await ctx.reply('This user does not exist in this server')
         return
     elif user in ctx.channel.members:
-        await ctx.reply(f'This user already exists in {ctx.chanel.name}')
+        await ctx.reply(f'This user already exists in {ctx.channel.name}')
         return
     
     author = ctx.author.global_name
@@ -321,10 +321,11 @@ async def invite(ctx, arg1: str):
     embed = Embed(color=discord.Color.purple())
     embed.add_field(name='Playlist Invite', value=f'{author} has invnited you to collaborate on {playlistname} in {guildname}\n*Note: This invitation will expire in 120 seconds*')
     view = Menu(channelid=channel_id, guildid=guild, channel=channel, user=user, playlistname=playlistname, guildname=guildname)
-    await ctx.author.send(embed=embed, view=view)
-        
+    await ctx.reply(f'An invite has been sent to {user.global_name}')
+    await user.send(embed=embed, view=view)
+    
 
-        
+    
 #Helper functions-----------------------------------------
 
 #check if author is owner of playlist/channel
