@@ -295,8 +295,16 @@ async def invite(ctx, arg1: str):
             overwrite.read_messages = True
             overwrite.send_messages = True
             await self.channel.set_permissions(self.user, overwrite=overwrite)
+            
+            #add user to playlistinfo users
+            collection = database.playlists_info
+            query = {'guildid':self.guildid, 'channelid': self.channelid}
+            userid = self.user.id
+            update = {'$push': {'users': str(userid)}}
+            collection.update_one(query, update)
+            
             await interaction.response.send_message(f'You have been added to {self.playlistname} in {self.guildname}')
-    
+            
     user = await ctx.guild.fetch_member(int(arg1))
     members = ctx.channel.members
     print('members: ', members)
@@ -324,7 +332,68 @@ async def invite(ctx, arg1: str):
     await ctx.reply(f'An invite has been sent to {user.global_name}')
     await user.send(embed=embed, view=view)
     
-
+@bot.hybrid_command(description="Removes a user from the playlist/channel", name="kick")
+async def kick(ctx, arg1: str):
+    class Menu(ui.View):
+        def __init__(self, channelid: str, guildid: str, channel: discord.channel, user: discord.user, playlistname: str, guildname: str):
+            super().__init__()
+            self.value = None
+            self.channelid = channelid
+            self.guildid = guildid
+            self.channel = channel
+            self.user = user
+            self.playlistname = playlistname
+            self.guildname = guildname
+            
+        @ui.button(label='Cancel', style=ButtonStyle.grey)
+        async def cancel(self, interaction: Interaction, button: ui.Button):
+            await interaction.response.send_message(f'Request has been canceled')
+            self.value = False
+            self.stop()
+            
+        @ui.button(label='Kick', style=ButtonStyle.danger)
+        async def kick(self, interaction: Interaction, button: ui.Button):
+            overwrite = discord.PermissionOverwrite()
+            overwrite.read_messages = False
+            overwrite.send_messages = False
+            await self.channel.set_permissions(self.user, overwrite=overwrite)
+            
+            #Remove user from playlistinfo users
+            collection = database.playlists_info
+            query = {'guildid':self.guildid, 'channelid': self.channelid}
+            userid = self.user.id
+            update = {'$pull': {'users': str(userid)}}
+            collection.update_one(query, update)
+            
+            await interaction.response.send_message(f'{self.user.name} has been removed from {playlistname}')
+            self.value = True
+            self.stop()
+    
+    user = await ctx.guild.fetch_member(int(arg1))
+    members = ctx.channel.members
+    print('members: ', members)
+    
+    #Check if this user is still in the server
+    if not user:
+        await ctx.reply('This user does not exist in this server')
+        return
+    elif user not in ctx.channel.members:
+        await ctx.reply(f'This user does not exist in {ctx.channel.name}')
+        return
+    
+    author = ctx.author.global_name
+    guild = str(ctx.guild.id)
+    channel = ctx.channel
+    channel_id = str(channel.id)
+    collection = database.playlists_info
+    doc = collection.find_one({'channelid': channel_id, 'guildid': guild})
+    playlistname = doc.get('name', None)
+    guildname = ctx.guild.name
+    
+    embed = Embed(color=discord.Color.purple())
+    embed.add_field(name='Playlist Invite', value=f'Are you sure you want to kick {user.name} from {playlistname}?')
+    view = Menu(channelid=channel_id, guildid=guild, channel=channel, user=user, playlistname=playlistname, guildname=guildname)
+    await ctx.reply(embed=embed, view=view, ephemeral=True)
     
 #Helper functions-----------------------------------------
 
