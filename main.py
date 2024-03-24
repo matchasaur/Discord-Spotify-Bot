@@ -45,6 +45,57 @@ intents.message_content = True # NOQA
 intents.members = True
 client: Client = Client(intents=intents)
 
+#Helper functions-----------------------------------------
+
+#check if author is owner of playlist/channel
+
+def check_owner(owner_id: str, channel_id: str):
+    collection = database.playlists_info
+    print(f'Checking if {owner_id} owns channel: {channel_id}')
+    result = collection.find_one({'ownerid': owner_id, 'channelid': channel_id})
+    print(f'The reuslt is: {result}')
+    return result
+
+async def is_owner(ctx):
+    user = str(ctx.author.id)
+    channelid = str(ctx.channel.id)
+    collection = database.playlists_info
+    print(f'Checking if {user} owns channel: {channelid}')
+    result = collection.find_one({'ownerid': user, 'channelid': channelid})
+    if result:
+        return True
+    else:
+        await ctx.reply('You do not have permission', ephemeral=True)
+        return False
+
+async def deleteplaylist(channel_id: str, guild_id: str, owner_id: str, channel: discord.channel):
+    collection = database.playlists_info
+    doc = collection.find_one({'ownerid': owner_id, 'channelid': channel_id})
+    name = doc.get('name', None)
+    id = doc.get('playlistid', None)
+    print('Playlist ID: ', id)
+    # res = await delete_playlist(id)
+    res = sp.user_playlist_unfollow(spuserID, id)
+    #Fix this? For some reason its deleting but return false
+    print('Del response: ', res)
+    
+    #FIX THIS: Currently there is no way to check if the playlist has successfully been deleted on spotify
+    # if not res:
+    #     print('Unable to delete playlist through spotify')
+    #     return False
+    
+    result = collection.delete_one({'ownerid': owner_id, 'channelid': channel_id, 'guildid': guild_id})
+    collection = database.tracks
+    collection.delete_many({'channelid': channel_id, 'guildid': guild_id, 'playlistid': id})
+    
+    if result.deleted_count > 0:
+        print(f'Document with guildid: {guild_id}, channelid: {channel_id}, and ownerid: {owner_id} has been deleted')  # Document was found and deleted
+        await channel.delete()
+        return name
+    else:
+        print('Document not found')  # Document was not found
+        return False
+
 #message func
 async def send_message(message: Message, user_message: str) -> None:
     if not user_message:
@@ -204,7 +255,7 @@ async def addsong(ctx, arg1: str):
     guildid = str(ctx.guild.id)
     channelid = str(ctx.channel.id)
 
-    track = arg1
+    track = arg1.split('?')[0]
     print('Track url: ', track)
     
     collection = database.playlists_info
@@ -245,7 +296,7 @@ async def removesong(ctx, arg1: str):
     guildid = str(ctx.guild.id)
     channelid = str(ctx.channel.id)
 
-    track = arg1
+    track = arg1.split('?')[0]
     print('Track url: ', track)
     
     collection1 = database.playlists_info
@@ -277,6 +328,7 @@ async def removesong(ctx, arg1: str):
         await ctx.send('Unable to remove track. This track does not exist in the playlist.')
 
 @bot.hybrid_command(description="Invites a user to collaborate on a playlist", name="invite")
+@commands.check(is_owner)
 async def invite(ctx, arg1: str):
     class Menu(ui.View):
         def __init__(self, channelid: str, guildid: str, channel: discord.channel, user: discord.user, playlistname: str, guildname: str):
@@ -333,6 +385,7 @@ async def invite(ctx, arg1: str):
     await user.send(embed=embed, view=view)
     
 @bot.hybrid_command(description="Removes a user from the playlist/channel", name="kick")
+@commands.check(is_owner)
 async def kick(ctx, arg1: str):
     class Menu(ui.View):
         def __init__(self, channelid: str, guildid: str, channel: discord.channel, user: discord.user, playlistname: str, guildname: str):
@@ -394,48 +447,6 @@ async def kick(ctx, arg1: str):
     embed.add_field(name='Playlist Invite', value=f'Are you sure you want to kick {user.name} from {playlistname}?')
     view = Menu(channelid=channel_id, guildid=guild, channel=channel, user=user, playlistname=playlistname, guildname=guildname)
     await ctx.reply(embed=embed, view=view, ephemeral=True)
-    
-#Helper functions-----------------------------------------
-
-#check if author is owner of playlist/channel
-
-def check_owner(owner_id: str, channel_id: str):
-    collection = database.playlists_info
-    print(f'Checking if {owner_id} owns channel: {channel_id}')
-    result = collection.find_one({'ownerid': owner_id, 'channelid': channel_id})
-    print(f'The reuslt is: {result}')
-    return result
-
-async def deleteplaylist(channel_id: str, guild_id: str, owner_id: str, channel: discord.channel):
-    collection = database.playlists_info
-    doc = collection.find_one({'ownerid': owner_id, 'channelid': channel_id})
-    name = doc.get('name', None)
-    id = doc.get('playlistid', None)
-    print('Playlist ID: ', id)
-    # res = await delete_playlist(id)
-    res = sp.user_playlist_unfollow(spuserID, id)
-    #Fix this? For some reason its deleting but return false
-    print('Del response: ', res)
-    
-    #FIX THIS: Currently there is no way to check if the playlist has successfully been deleted on spotify
-    # if not res:
-    #     print('Unable to delete playlist through spotify')
-    #     return False
-    
-    result = collection.delete_one({'ownerid': owner_id, 'channelid': channel_id, 'guildid': guild_id})
-    collection = database.tracks
-    collection.delete_many({'channelid': channel_id, 'guildid': guild_id, 'playlistid': id})
-    
-    if result.deleted_count > 0:
-        print(f'Document with guildid: {guild_id}, channelid: {channel_id}, and ownerid: {owner_id} has been deleted')  # Document was found and deleted
-        await channel.delete()
-        return name
-    else:
-        print('Document not found')  # Document was not found
-        return False
-    
-    
-    
     
 
 def main() -> None:
